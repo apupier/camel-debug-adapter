@@ -34,6 +34,7 @@ import org.eclipse.lsp4j.debug.ContinueArguments;
 import org.eclipse.lsp4j.debug.ContinueResponse;
 import org.eclipse.lsp4j.debug.DisconnectArguments;
 import org.eclipse.lsp4j.debug.InitializeRequestArguments;
+import org.eclipse.lsp4j.debug.NextArguments;
 import org.eclipse.lsp4j.debug.Scope;
 import org.eclipse.lsp4j.debug.ScopesArguments;
 import org.eclipse.lsp4j.debug.ScopesResponse;
@@ -294,6 +295,29 @@ public class CamelDebugAdapterServer implements IDebugProtocolServer {
 	
 	@Override
 	public CompletableFuture<ContinueResponse> continue_(ContinueArguments args) {	
+		clearVariableRefCache();
+		connectionManager.resumeAll();
+		return CompletableFuture.completedFuture(new ContinueResponse());
+	}
+
+	@Override
+	public CompletableFuture<Void> next(NextArguments args) {
+		if(connectionManager.getBacklogDebugger().isSingleStepMode()) {
+			connectionManager.getBacklogDebugger().step();
+		} else {
+			Set<String> suspendedBreakpointIds = connectionManager.getNotifiedSuspendedBreakpointIds();
+			if(!suspendedBreakpointIds.isEmpty()) {
+				// TODO: when supporting several breakpoint suspended at same time, will need to search based on the ThreadId
+				String breakPointId = suspendedBreakpointIds.iterator().next();
+				connectionManager.getBacklogDebugger().stepBreakpoint(breakPointId);
+				suspendedBreakpointIds.remove(breakPointId);
+			}
+		}
+		clearVariableRefCache();
+		return CompletableFuture.completedFuture(null);
+	}
+	
+	private void clearVariableRefCache() {
 		debuggerVariableReferenceToBreakpointId.clear();
 		endpointVariableReferenceToBreakpointId.clear();
 		exchangeVariableReferenceToBreakpointId.clear();
@@ -302,8 +326,6 @@ public class CamelDebugAdapterServer implements IDebugProtocolServer {
 		messagevariableReferenceToBreakpointId.clear();
 		processorVariableReferenceToBreakpointId.clear();
 		variableReferenceToExchangeProperties.clear();
-		connectionManager.resumeAll();
-		return CompletableFuture.completedFuture(new ContinueResponse());
 	}
 	
 	@Override

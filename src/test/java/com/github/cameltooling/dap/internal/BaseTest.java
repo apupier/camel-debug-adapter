@@ -57,7 +57,7 @@ public abstract class BaseTest {
 
 	protected void waitBreakpointNotification(int numberOfBreakpointNotifications) {
 		await("Wait that breakpoint hit is notified")
-			.atMost(Duration.ofSeconds(3))
+			.atMost(Duration.ofSeconds(60))
 			.until(() -> 
 			{ 
 				return clientProxy.getStoppedEventArguments().size() == numberOfBreakpointNotifications;
