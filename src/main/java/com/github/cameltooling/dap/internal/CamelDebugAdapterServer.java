@@ -34,6 +34,9 @@ import org.eclipse.lsp4j.debug.Capabilities;
 import org.eclipse.lsp4j.debug.ContinueArguments;
 import org.eclipse.lsp4j.debug.ContinueResponse;
 import org.eclipse.lsp4j.debug.DisconnectArguments;
+import org.eclipse.lsp4j.debug.EvaluateArguments;
+import org.eclipse.lsp4j.debug.EvaluateArgumentsContext;
+import org.eclipse.lsp4j.debug.EvaluateResponse;
 import org.eclipse.lsp4j.debug.InitializeRequestArguments;
 import org.eclipse.lsp4j.debug.NextArguments;
 import org.eclipse.lsp4j.debug.OutputEventArguments;
@@ -51,6 +54,7 @@ import org.eclipse.lsp4j.debug.StackTraceResponse;
 import org.eclipse.lsp4j.debug.TerminateArguments;
 import org.eclipse.lsp4j.debug.ThreadsResponse;
 import org.eclipse.lsp4j.debug.Variable;
+import org.eclipse.lsp4j.debug.VariablePresentationHint;
 import org.eclipse.lsp4j.debug.VariablesArguments;
 import org.eclipse.lsp4j.debug.VariablesResponse;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolClient;
@@ -82,7 +86,9 @@ public class CamelDebugAdapterServer implements IDebugProtocolServer {
 	@Override
 	public CompletableFuture<Capabilities> initialize(InitializeRequestArguments args) {
 		client.initialized();
-		return CompletableFuture.completedFuture(new Capabilities());
+		Capabilities capabilities = new Capabilities();
+		capabilities.setSupportsClipboardContext(Boolean.TRUE);
+		return CompletableFuture.completedFuture(capabilities);
 	}
 	
 	@Override
@@ -245,6 +251,23 @@ public class CamelDebugAdapterServer implements IDebugProtocolServer {
 
 	public BacklogDebuggerConnectionManager getConnectionManager() {
 		return connectionManager;
+	}
+	
+	@Override
+	public CompletableFuture<EvaluateResponse> evaluate(EvaluateArguments args) {
+		if (EvaluateArgumentsContext.CLIPBOARD.equals(args.getContext())) {
+			// TODO a special handling when using a "scope" variable
+		}
+		Optional<CamelThread> camelThread = connectionManager.getCamelThreads().stream().filter(thread -> thread.getId() == args.getFrameId()).findAny();
+		if (camelThread.isPresent()) {
+			String evaluated = connectionManager.getBacklogDebugger().evaluateExpressionAtBreakpoint(camelThread.get().getBreakPointId(), "simple", args.getExpression());
+			EvaluateResponse response = new EvaluateResponse();
+			response.setResult(evaluated);
+			return CompletableFuture.completedFuture(response);
+		}
+		EvaluateResponse errorResponse = new EvaluateResponse();
+		errorResponse.setResult("Wasn't able to evaluate the expression.");
+		return CompletableFuture.completedFuture(errorResponse);
 	}
 
 }
